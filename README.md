@@ -30,7 +30,7 @@ A comprehensive web-based GPS tracking application for the ATGM336H GPS+BeiDou m
 ## 🚀 Быстрый старт
 
 ### Веб-версия (рекомендуется)
-```bash
+
 # Клонируйте репозиторий
 git clone https://github.com/yourusername/gps-tracker-atgm336h.git
 cd gps-tracker-atgm336h
