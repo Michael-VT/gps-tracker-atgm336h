@@ -426,6 +426,18 @@ gps-tracker-atgm336h/
     
     └── gps_data_*.txt
 
+gps-tracker-atgm336h/
+├── 📄 README.md              # Документация (этот файл)
+├── 🌐 index.html             # Основное веб-приложение
+├── 🐍 gps_monitor.py         # Python монитор с буферизацией
+├── 📊 gps_analyzer.py        # Анализатор логов
+├── ⚙️ config.py              # Конфигурационные параметры
+├── 📦 requirements.txt       # Python зависимости
+├── 📄 LICENSE               # MIT лицензия
+└── 📁 gps_logs/             # Директория логов (создается автоматически)
+    ├── gps_trec_log_*.txt
+    └── gps_data_*.txt
+
 ⚙️ Конфигурация
 
 Настройки веб-приложения
