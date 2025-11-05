@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPS Tracker ATGM336H - WebSocket</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2c3e50;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+            --background-color: #ecf0f1;
+            --text-color: #2c3e50;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--background-color);
+            color: var(--text-color);
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .app-container {
+            display: flex;
+            height: 100vh;
+            transition: all 0.3s ease;
+        }
+        
+        .horizontal-layout {
+            flex-direction: row;
+        }
+        
+        .horizontal-layout .map-container {
+            flex: 0 0 80%;
+            height: 100%;
+        }
+        
+        .horizontal-layout .info-container {
+            flex: 0 0 20%;
+            height: 100%;
+            overflow-y: auto;
+            background: white;
+            border-left: 3px solid var(--secondary-color);
+        }
+        
+        .vertical-layout {
+            flex-direction: column;
+        }
+        
+        .vertical-layout .map-container {
+            flex: 0 0 80%;
+            width: 100%;
+        }
+        
+        .vertical-layout .info-container {
+            flex: 0 0 20%;
+            width: 100%;
+            overflow-y: auto;
+            background: white;
+            border-top: 3px solid var(--secondary-color);
+        }
+        
+        .map-container {
+            position: relative;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .map-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        
+        .info-container {
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .panel-title {
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            color: var(--secondary-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .status-item {
+            padding: 8px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e1e8ed;
+        }
+        
+        .status-label {
+            font-size: 0.8em;
+            color: #7f8c8d;
+            margin-bottom: 3px;
+        }
+        
+        .status-value {
+            font-size: 0.9em;
+            font-weight: bold;
+            color: var(--text-color);
+        }
+        
+        .coordinates {
+            grid-column: 1 / -1;
+            background: #e8f4fd !important;
+            border: 1px solid var(--primary-color) !important;
+        }
+        
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        #layoutToggleBtn {
+            background: var(--secondary-color);
+            color: white;
+        }
+        
+        #layoutToggleBtn:hover {
+            background: #1a252f;
+        }
+        
+        .signal-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .signal-weak { background: var(--danger-color); }
+        .signal-medium { background: var(--warning-color); }
+        .signal-strong { background: var(--success-color); }
+        
+        .satellite-bar {
+            height: 15px;
+            background: #ecf0f1;
+            border-radius: 8px;
+            margin: 8px 0;
+            overflow: hidden;
+        }
+        
+        .satellite-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--danger-color), var(--warning-color), var(--success-color));
+            transition: width 0.5s ease;
+        }
+        
+        .quality-excellent { color: var(--success-color); }
+        .quality-good { color: var(--warning-color); }
+        .quality-poor { color: var(--danger-color); }
+        .quality-none { color: #95a5a6; }
+        
+        .nmea-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 200px;
+        }
+        
+        #nmeaData {
+            flex: 1;
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 10px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8em;
+            line-height: 1.3;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        .pulse {
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container horizontal-layout" id="appContainer">
+        <div class="map-container">
+            <div id="map"></div>
+            <div class="map-controls">
+                <button id="layoutToggleBtn" title="Переключить ориентацию">
+                    <span id="layoutIcon">↔</span> Горизонтально
+                </button>
+            </div>
+        </div>
+        
+        <div class="info-container">
+            <div class="panel">
+                <div class="panel-title">🔌 Подключение (WebSocket)</div>
+                <div class="status-item">
+                    <div class="status-label">Статус подключения</div>
+                    <div class="status-value">
+                        <span class="signal-indicator" id="connectionIndicator"></span>
+                        <span id="connectionStatus">Подключение...</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">📡 Статус GPS</div>
+                <div class="status-grid">
+                    <div class="status-item coordinates">
+                        <div class="status-label">Координаты</div>
+                        <div class="status-value" id="coordinates">Ожидание данных...</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Качество фиксации</div>
+                        <div class="status-value" id="fixStatus">Неизвестно</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Время GPS</div>
+                        <div class="status-value" id="gpsTime">--:--:--</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Скорость</div>
+                        <div class="status-value" id="speed">0.0 км/ч</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Высота</div>
+                        <div class="status-value" id="altitude">0.0 м</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Курс</div>
+                        <div class="status-value" id="course">0°</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">🛰️ Спутники</div>
+                <div class="status-item">
+                    <div class="status-label">Видимые спутники</div>
+                    <div class="status-value" id="satellitesCount">0</div>
+                    <div class="satellite-bar">
+                        <div class="satellite-fill" id="satelliteBar" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Точность (HDOP)</div>
+                    <div class="status-value" id="hdop">0.0</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">PPS импульсы</div>
+                    <div class="status-value">
+                        <span id="ppsStatus" class="pulse">⚪ ОЖИДАНИЕ</span>
+                        <br>
+                        <small>Счетчик: <span id="ppsCount">0</span></small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">📊 Статистика</div>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="status-label">Всего сообщений</div>
+                        <div class="status-value" id="messageCount">0</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Ошибок парсинга</div>
+                        <div class="status-value" id="errorCount">0</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Неверных сообщений</div>
+                        <div class="status-value" id="invalidCount">0</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Время работы</div>
+                        <div class="status-value" id="uptime">00:00:00</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Скорость данных</div>
+                        <div class="status-value" id="dataRate">0/с</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel nmea-container">
+                <div class="panel-title">📨 NMEA данные</div>
+                <div id="nmeaData"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        class GPSTracker {
+            constructor() {
+                this.map = null;
+                this.marker = null;
+                this.accuracyCircle = null;
+                this.isConnected = false;
+                this.messageCount = 0;
+                this.errorCount = 0;
+                this.invalidCount = 0;
+                this.truncatedCount = 0;
+                this.ppsCount = 0;
+                this.startTime = Date.now();
+                this.lastMessages = [];
+                this.isHorizontalLayout = true;
+                
+                // GPS данные
+                this.latitude = null;
+                this.longitude = null;
+                this.altitude = null;
+                this.speed = null;
+                this.course = null;
+                this.timestamp = null;
+                this.num_satellites = 0;
+                this.fix_quality = 0;
+                this.hdop = 0.0;
+                
+                this.socket = io();
+                this.setupSocketEvents();
+                this.initMap();
+                this.setupEventListeners();
+                this.updateUptime();
+                setInterval(() => this.updateUptime(), 1000);
+            }
+
+            setupSocketEvents() {
+                this.socket.on('connect', () => {
+                    console.log("WebSocket подключен");
+                    this.updateConnectionStatus('connected', 'Подключено к GPS модулю');
+                });
+
+                this.socket.on('disconnect', () => {
+                    console.log("WebSocket отключен");
+                    this.updateConnectionStatus('error', 'Отключено от сервера');
+                });
+
+                this.socket.on('gps_data', (data) => {
+                    this.processNMEAData(data.nmea);
+                });
+
+                this.socket.on('connection_status', (data) => {
+                    this.updateConnectionStatus(data.status, data.message);
+                });
+            }
+
+            setupEventListeners() {
+                document.getElementById('layoutToggleBtn').addEventListener('click', () => {
+                    this.toggleLayout();
+                });
+            }
+
+            toggleLayout() {
+                const appContainer = document.getElementById('appContainer');
+                const layoutIcon = document.getElementById('layoutIcon');
+                const layoutToggleBtn = document.getElementById('layoutToggleBtn');
+                
+                this.isHorizontalLayout = !this.isHorizontalLayout;
+                
+                if (this.isHorizontalLayout) {
+                    appContainer.className = 'app-container horizontal-layout';
+                    layoutIcon.textContent = '↔';
+                    layoutToggleBtn.innerHTML = '<span id="layoutIcon">↔</span> Горизонтально';
+                } else {
+                    appContainer.className = 'app-container vertical-layout';
+                    layoutIcon.textContent = '↕';
+                    layoutToggleBtn.innerHTML = '<span id="layoutIcon">↕</span> Вертикально';
+                }
+                
+                setTimeout(() => {
+                    this.map.invalidateSize();
+                }, 300);
+            }
+
+            initMap() {
+                this.map = L.map('map').setView([50.0, 10.0], 4);
+                
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(this.map);
+
+                L.control.scale().addTo(this.map);
+            }
+
+            processNMEAData(line) {
+                this.messageCount++;
+                this.lastMessages.push(line);
+                
+                // Ограничиваем количество сохраняемых сообщений
+                if (this.lastMessages.length > 200) {
+                    this.lastMessages.shift();
+                }
+                
+                this.displayNMEALine(line);
+                this.parseNMEALine(line);
+                this.updateDisplay();
+            }
+
+            parseNMEALine(line) {
+                try {
+                    const fields = line.split(',');
+                    const sentenceType = fields[0];
+                    
+                    switch(sentenceType) {
+                        case '$GNGGA':
+                        case '$GPGGA':
+                            this.parseGGA(fields);
+                            break;
+                        case '$GNRMC':
+                        case '$GPRMC':
+                            this.parseRMC(fields);
+                            break;
+                        case '$GNGSA':
+                        case '$GPGSA':
+                            this.parseGSA(fields);
+                            break;
+                        case '$GPTXT':
+                            if (line.includes('PPS')) {
+                                this.detectPPS();
+                            }
+                            break;
+                    }
+                } catch (error) {
+                    console.error('Ошибка парсинга NMEA:', error);
+                    this.errorCount++;
+                }
+            }
+
+            parseGGA(fields) {
+                // $GNGGA,time,lat,lat_dir,lon,lon_dir,quality,num_sats,hdop,alt,alt_units,...*checksum
+                if (fields[6] && fields[6] !== '0') {
+                    const lat = this.convertToDecimal(fields[2], fields[3]);
+                    const lon = this.convertToDecimal(fields[4], fields[5]);
+                    
+                    if (lat && lon) {
+                        this.updatePosition(lat, lon);
+                    }
+                    
+                    if (fields[9]) {
+                        this.altitude = parseFloat(fields[9]);
+                        document.getElementById('altitude').textContent = 
+                            `${this.altitude.toFixed(1)} м`;
+                    }
+                }
+                
+                // Время GPS
+                if (fields[1]) {
+                    const timeStr = fields[1];
+                    if (timeStr.length >= 6) {
+                        const formattedTime = `${timeStr.substr(0,2)}:${timeStr.substr(2,2)}:${timeStr.substr(4,2)}`;
+                        this.timestamp = formattedTime;
+                        document.getElementById('gpsTime').textContent = formattedTime;
+                    }
+                }
+                
+                // Качество фиксации
+                if (fields[6]) {
+                    this.updateFixQuality(parseInt(fields[6]));
+                }
+                
+                // Количество спутников
+                if (fields[7]) {
+                    this.num_satellites = parseInt(fields[7]);
+                    document.getElementById('satellitesCount').textContent = this.num_satellites;
+                    const percent = Math.min((this.num_satellites / 20) * 100, 100);
+                    document.getElementById('satelliteBar').style.width = `${percent}%`;
+                }
+                
+                // HDOP
+                if (fields[8]) {
+                    this.hdop = parseFloat(fields[8]);
+                    document.getElementById('hdop').textContent = this.hdop.toFixed(1);
+                    this.updateHDOPQuality(this.hdop);
+                }
+            }
+
+            parseRMC(fields) {
+                // $GNRMC,time,status,lat,lat_dir,lon,lon_dir,speed,course,date,...*checksum
+                if (fields[2] === 'A') {
+                    const lat = this.convertToDecimal(fields[3], fields[4]);
+                    const lon = this.convertToDecimal(fields[5], fields[6]);
+                    
+                    if (lat && lon) {
+                        this.updatePosition(lat, lon);
+                    }
+                    
+                    // Скорость
+                    if (fields[7]) {
+                        const speedKnots = parseFloat(fields[7]);
+                        this.speed = speedKnots * 1.852;
+                        document.getElementById('speed').textContent = 
+                            `${this.speed.toFixed(1)} км/ч`;
+                    }
+                    
+                    // Курс
+                    if (fields[8]) {
+                        this.course = parseFloat(fields[8]);
+                        document.getElementById('course').textContent = 
+                            `${this.course.toFixed(0)}°`;
+                    }
+                }
+            }
+
+            parseGSA(fields) {
+                // Дополнительная информация о режиме фиксации
+                // Можно добавить при необходимости
+            }
+
+            convertToDecimal(coord, direction) {
+                if (!coord || !direction) return null;
+                
+                try {
+                    // Формат: DDMM.MMMMM
+                    const degrees = parseFloat(coord.substring(0, 2));
+                    const minutes = parseFloat(coord.substring(2));
+                    
+                    let decimal = degrees + minutes / 60.0;
+                    
+                    if (direction === 'S' || direction === 'W') {
+                        decimal = -decimal;
+                    }
+                    
+                    return decimal;
+                } catch (error) {
+                    console.error('Ошибка конвертации координат:', error);
+                    return null;
+                }
+            }
+
+            detectPPS() {
+                this.ppsCount++;
+                document.getElementById('ppsStatus').textContent = '✅ PPS АКТИВЕН';
+                document.getElementById('ppsStatus').classList.add('pulse');
+                document.getElementById('ppsCount').textContent = this.ppsCount;
+                
+                setTimeout(() => {
+                    document.getElementById('ppsStatus').textContent = '⚪ ОЖИДАНИЕ';
+                    document.getElementById('ppsStatus').classList.remove('pulse');
+                }, 2000);
+            }
+
+            updatePosition(lat, lon) {
+                this.latitude = lat;
+                this.longitude = lon;
+                
+                const coordsText = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+                document.getElementById('coordinates').textContent = coordsText;
+                
+                const latLng = [lat, lon];
+                
+                if (this.marker) {
+                    this.marker.setLatLng(latLng);
+                } else {
+                    this.marker = L.marker(latLng)
+                        .addTo(this.map)
+                        .bindPopup('Текущее положение GPS')
+                        .openPopup();
+                    
+                    this.map.setView(latLng, 15);
+                }
+                
+                // Добавляем круг точности если есть HDOP
+                if (this.hdop && this.hdop > 0) {
+                    const accuracyRadius = this.hdop * 5; // Упрощенная формула
+                    
+                    // Убираем старый круг
+                    if (this.accuracyCircle) {
+                        this.map.removeLayer(this.accuracyCircle);
+                    }
+                    
+                    this.accuracyCircle = L.circle(latLng, {
+                        radius: accuracyRadius,
+                        color: '#3498db',
+                        fillColor: '#2980b9',
+                        fillOpacity: 0.1,
+                        weight: 1
+                    }).addTo(this.map);
+                }
+            }
+
+            updateFixQuality(quality) {
+                const qualities = {
+                    0: ['Нет фиксации', 'quality-none'],
+                    1: ['GPS фиксация', 'quality-excellent'],
+                    2: ['DGPS фиксация', 'quality-good'],
+                    3: ['PPS фиксация', 'quality-excellent'],
+                    4: ['RTK', 'quality-excellent'],
+                    5: ['Float RTK', 'quality-good']
+                };
+                
+                const [text, className] = qualities[quality] || ['Неизвестно', 'quality-none'];
+                const element = document.getElementById('fixStatus');
+                element.textContent = text;
+                element.className = `status-value ${className}`;
+            }
+
+            updateHDOPQuality(hdop) {
+                const element = document.getElementById('hdop');
+                if (hdop < 1) element.className = 'status-value quality-excellent';
+                else if (hdop < 2) element.className = 'status-value quality-good';
+                else if (hdop < 5) element.className = 'status-value quality-poor';
+                else element.className = 'status-value quality-none';
+            }
+
+            updateConnectionStatus(status, message) {
+                const indicator = document.getElementById('connectionIndicator');
+                const statusElement = document.getElementById('connectionStatus');
+                
+                statusElement.textContent = message;
+                
+                indicator.className = 'signal-indicator';
+                if (status === 'connected') {
+                    indicator.classList.add('signal-strong');
+                    this.isConnected = true;
+                } else if (status === 'error') {
+                    indicator.classList.add('signal-weak');
+                    this.isConnected = false;
+                }
+            }
+
+            displayNMEALine(line) {
+                const nmeaDiv = document.getElementById('nmeaData');
+                const timestamp = new Date().toLocaleTimeString();
+                nmeaDiv.innerHTML += `[${timestamp}] ${line}\n`;
+                nmeaDiv.scrollTop = nmeaDiv.scrollHeight;
+                
+                // Ограничиваем количество отображаемых строк
+                const lines = nmeaDiv.innerHTML.split('\n');
+                if (lines.length > 50) {
+                    nmeaDiv.innerHTML = lines.slice(-50).join('\n');
+                }
+            }
+
+            updateDisplay() {
+                document.getElementById('messageCount').textContent = this.messageCount;
+                document.getElementById('errorCount').textContent = this.errorCount;
+                document.getElementById('invalidCount').textContent = this.invalidCount;
+                
+                // Расчет скорости данных (сообщений в секунду)
+                const uptimeSeconds = (Date.now() - this.startTime) / 1000;
+                const dataRate = uptimeSeconds > 0 ? (this.messageCount / uptimeSeconds).toFixed(1) : '0';
+                document.getElementById('dataRate').textContent = `${dataRate}/с`;
+            }
+
+            updateUptime() {
+                const uptimeSeconds = Math.floor((Date.now() - this.startTime) / 1000);
+                const hours = Math.floor(uptimeSeconds / 3600);
+                const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+                const seconds = uptimeSeconds % 60;
+                
+                document.getElementById('uptime').textContent = 
+                    `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+        }
+
+        // Инициализация при загрузке страницы
+        let gpsTracker;
+        document.addEventListener('DOMContentLoaded', () => {
+            gpsTracker = new GPSTracker();
+        });
+    </script>
+</body>
+</html>
