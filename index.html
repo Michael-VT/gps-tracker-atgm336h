@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPS Tracker ATGM336H</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2c3e50;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+            --background-color: #ecf0f1;
+            --text-color: #2c3e50;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--background-color);
+            color: var(--text-color);
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .app-container {
+            display: flex;
+            height: 100vh;
+            transition: all 0.3s ease;
+        }
+        
+        /* Горизонтальный режим */
+        .horizontal-layout {
+            flex-direction: row;
+        }
+        
+        .horizontal-layout .map-container {
+            flex: 0 0 80%;
+            height: 100%;
+        }
+        
+        .horizontal-layout .info-container {
+            flex: 0 0 20%;
+            height: 100%;
+            overflow-y: auto;
+            background: white;
+            border-left: 3px solid var(--secondary-color);
+        }
+        
+        /* Вертикальный режим */
+        .vertical-layout {
+            flex-direction: column;
+        }
+        
+        .vertical-layout .map-container {
+            flex: 0 0 80%;
+            width: 100%;
+        }
+        
+        .vertical-layout .info-container {
+            flex: 0 0 20%;
+            width: 100%;
+            overflow-y: auto;
+            background: white;
+            border-top: 3px solid var(--secondary-color);
+        }
+        
+        /* Общие стили для карты */
+        .map-container {
+            position: relative;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Контролы карты */
+        .map-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            display: flex;
+            gap: 10px;
+        }
+        
+        /* Информационный контейнер */
+        .info-container {
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        /* Панели информации */
+        .panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .panel-title {
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            color: var(--secondary-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .status-item {
+            padding: 8px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e1e8ed;
+        }
+        
+        .status-label {
+            font-size: 0.8em;
+            color: #7f8c8d;
+            margin-bottom: 3px;
+        }
+        
+        .status-value {
+            font-size: 0.9em;
+            font-weight: bold;
+            color: var(--text-color);
+        }
+        
+        .coordinates {
+            grid-column: 1 / -1;
+            background: #e8f4fd !important;
+            border: 1px solid var(--primary-color) !important;
+        }
+        
+        /* Кнопки */
+        .control-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        #connectBtn {
+            background: var(--success-color);
+            color: white;
+        }
+        
+        #connectBtn:hover {
+            background: #219a52;
+        }
+        
+        #connectBtn.connected {
+            background: var(--danger-color);
+        }
+        
+        #saveLogBtn {
+            background: var(--warning-color);
+            color: white;
+        }
+        
+        #saveLogBtn:hover {
+            background: #e67e22;
+        }
+        
+        #layoutToggleBtn, #settingsBtn {
+            background: var(--secondary-color);
+            color: white;
+        }
+        
+        #layoutToggleBtn:hover, #settingsBtn:hover {
+            background: #1a252f;
+        }
+        
+        /* Индикаторы */
+        .signal-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .signal-weak { background: var(--danger-color); }
+        .signal-medium { background: var(--warning-color); }
+        .signal-strong { background: var(--success-color); }
+        
+        .satellite-bar {
+            height: 15px;
+            background: #ecf0f1;
+            border-radius: 8px;
+            margin: 8px 0;
+            overflow: hidden;
+        }
+        
+        .satellite-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--danger-color), var(--warning-color), var(--success-color));
+            transition: width 0.5s ease;
+        }
+        
+        .quality-excellent { color: var(--success-color); }
+        .quality-good { color: var(--warning-color); }
+        .quality-poor { color: var(--danger-color); }
+        .quality-none { color: #95a5a6; }
+        
+        /* NMEA данные */
+        .nmea-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 200px;
+        }
+        
+        #nmeaData {
+            flex: 1;
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 10px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8em;
+            line-height: 1.3;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        /* Модальное окно настроек */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        .modal-title {
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            color: var(--secondary-color);
+        }
+        
+        .setting-item {
+            margin-bottom: 15px;
+        }
+        
+        .setting-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .setting-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1em;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+        
+        /* Анимации */
+        .pulse {
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        /* Адаптивность */
+        @media (max-width: 768px) {
+            .app-container {
+                flex-direction: column !important;
+            }
+            
+            .map-container {
+                flex: 0 0 60% !important;
+            }
+            
+            .info-container {
+                flex: 0 0 40% !important;
+            }
+            
+            .status-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .map-controls {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container horizontal-layout" id="appContainer">
+        <!-- Контейнер карты -->
+        <div class="map-container">
+            <div id="map"></div>
+            <div class="map-controls">
+                <button id="layoutToggleBtn" title="Переключить ориентацию">
+                    <span id="layoutIcon">↔</span> Горизонтально
+                </button>
+                <button id="settingsBtn" title="Настройки">
+                    ⚙️ Настройки
+                </button>
+            </div>
+        </div>
+        
+        <!-- Контейнер информации -->
+        <div class="info-container">
+            <!-- Панель подключения -->
+            <div class="panel">
+                <div class="panel-title">🔌 Подключение</div>
+                <div class="control-buttons">
+                    <button id="connectBtn">
+                        <span id="connectIcon">🔗</span>
+                        <span id="connectText">Подключиться</span>
+                    </button>
+                    <button id="saveLogBtn">
+                        💾 Сохранить лог
+                    </button>
+                </div>
+                <div class="status-item" style="margin-top: 10px;">
+                    <div class="status-label">Статус подключения</div>
+                    <div class="status-value">
+                        <span class="signal-indicator" id="connectionIndicator"></span>
+                        <span id="connectionStatus">Не подключено</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Панель статуса GPS -->
+            <div class="panel">
+                <div class="panel-title">📡 Статус GPS</div>
+                <div class="status-grid">
+                    <div class="status-item coordinates">
+                        <div class="status-label">Координаты</div>
+                        <div class="status-value" id="coordinates">Ожидание данных...</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Качество фиксации</div>
+                        <div class="status-value" id="fixStatus">Неизвестно</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Время GPS</div>
+                        <div class="status-value" id="gpsTime">--:--:--</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Скорость</div>
+                        <div class="status-value" id="speed">0.0 км/ч</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Высота</div>
+                        <div class="status-value" id="altitude">0.0 м</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Курс</div>
+                        <div class="status-value" id="course">0°</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Панель спутников -->
+            <div class="panel">
+                <div class="panel-title">🛰️ Спутники</div>
+                <div class="status-item">
+                    <div class="status-label">Видимые спутники</div>
+                    <div class="status-value" id="satellitesCount">0</div>
+                    <div class="satellite-bar">
+                        <div class="satellite-fill" id="satelliteBar" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Точность (HDOP)</div>
+                    <div class="status-value" id="hdop">0.0</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">PPS импульсы</div>
+                    <div class="status-value">
+                        <span id="ppsStatus" class="pulse">⚪ ОЖИДАНИЕ</span>
+                        <br>
+                        <small>Счетчик: <span id="ppsCount">0</span></small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Панель статистики -->
+            <div class="panel">
+                <div class="panel-title">📊 Статистика</div>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="status-label">Всего сообщений</div>
+                        <div class="status-value" id="messageCount">0</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Ошибок парсинга</div>
+                        <div class="status-value" id="errorCount">0</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Неверных сообщений</div>
+                        <div class="status-value" id="invalidCount">0</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Обрезанных сообщений</div>
+                        <div class="status-value" id="truncatedCount">0</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Время работы</div>
+                        <div class="status-value" id="uptime">00:00:00</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Скорость данных</div>
+                        <div class="status-value" id="dataRate">0/с</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Сохраняемых строк</div>
+                        <div class="status-value" id="savedLinesCount">200</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Размер буфера</div>
+                        <div class="status-value" id="bufferSize">0</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Панель NMEA данных -->
+            <div class="panel nmea-container">
+                <div class="panel-title">📨 NMEA данные</div>
+                <div id="nmeaData"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно настроек -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-title">⚙️ Настройки</div>
+            
+            <div class="setting-item">
+                <label class="setting-label" for="maxLinesInput">
+                    Количество сохраняемых строк в логе:
+                </label>
+                <input type="number" id="maxLinesInput" class="setting-input" 
+                       min="10" max="1000" value="200">
+            </div>
+            
+            <div class="setting-item">
+                <label class="setting-label" for="autoSaveCheckbox">
+                    <input type="checkbox" id="autoSaveCheckbox">
+                    Автосохранение при отключении
+                </label>
+            </div>
+            
+            <div class="setting-item">
+                <label class="setting-label" for="baudRateSelect">
+                    Скорость порта:
+                </label>
+                <select id="baudRateSelect" class="setting-input">
+                    <option value="4800">4800</option>
+                    <option value="9600" selected>9600</option>
+                    <option value="19200">19200</option>
+                    <option value="38400">38400</option>
+                    <option value="57600">57600</option>
+                    <option value="115200">115200</option>
+                </select>
+            </div>
+
+            <div class="setting-item">
+                <label class="setting-label" for="bufferSizeSelect">
+                    Размер буфера:
+                </label>
+                <select id="bufferSizeSelect" class="setting-input">
+                    <option value="1024">1 KB</option>
+                    <option value="2048">2 KB</option>
+                    <option value="4096" selected>4 KB</option>
+                    <option value="8192">8 KB</option>
+                    <option value="16384">16 KB</option>
+                </select>
+            </div>
+
+            <div class="setting-item">
+                <label class="setting-label" for="truncatedHandlingSelect">
+                    Обработка обрезанных сообщений:
+                </label>
+                <select id="truncatedHandlingSelect" class="setting-input">
+                    <option value="ignore">Игнорировать</option>
+                    <option value="save" selected>Сохранять в лог</option>
+                    <option value="reconstruct">Пытаться восстановить</option>
+                </select>
+            </div>
+            
+            <div class="modal-buttons">
+                <button id="saveSettingsBtn" style="background: var(--success-color); color: white;">
+                    💾 Сохранить
+                </button>
+                <button id="closeSettingsBtn" style="background: var(--danger-color); color: white;">
+                    ❌ Отмена
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        class GPSTracker {
+            constructor() {
+                this.map = null;
+                this.marker = null;
+                this.accuracyCircle = null;
+                this.serialPort = null;
+                this.reader = null;
+                this.isConnected = false;
+                this.messageCount = 0;
+                this.errorCount = 0;
+                this.invalidCount = 0;
+                this.truncatedCount = 0;
+                this.ppsCount = 0;
+                this.startTime = Date.now();
+                this.lastMessages = [];
+                this.isHorizontalLayout = true;
+                this.dataBuffer = "";
+                
+                // Настройки по умолчанию
+                this.settings = {
+                    maxLogLines: 200,
+                    autoSave: false,
+                    baudRate: 9600,
+                    bufferSize: 4096,
+                    truncatedHandling: "save"
+                };
+                
+                this.initMap();
+                this.setupEventListeners();
+                this.loadSettings();
+                this.updateUptime();
+                setInterval(() => this.updateUptime(), 1000);
+            }
+
+            initMap() {
+                this.map = L.map('map').setView([50.0, 10.0], 4);
+                
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(this.map);
+
+                L.control.scale().addTo(this.map);
+            }
+
+            setupEventListeners() {
+                document.getElementById('connectBtn').addEventListener('click', () => {
+                    if (!this.isConnected) {
+                        this.connectSerial();
+                    } else {
+                        this.disconnect();
+                    }
+                });
+
+                document.getElementById('saveLogBtn').addEventListener('click', () => {
+                    this.saveLog();
+                });
+
+                document.getElementById('layoutToggleBtn').addEventListener('click', () => {
+                    this.toggleLayout();
+                });
+
+                document.getElementById('settingsBtn').addEventListener('click', () => {
+                    this.showSettings();
+                });
+
+                document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+                    this.saveSettings();
+                });
+
+                document.getElementById('closeSettingsBtn').addEventListener('click', () => {
+                    this.hideSettings();
+                });
+
+                // Закрытие модального окна при клике вне его
+                document.getElementById('settingsModal').addEventListener('click', (e) => {
+                    if (e.target.id === 'settingsModal') {
+                        this.hideSettings();
+                    }
+                });
+            }
+
+            loadSettings() {
+                const savedSettings = localStorage.getItem('gpsTrackerSettings');
+                if (savedSettings) {
+                    this.settings = {...this.settings, ...JSON.parse(savedSettings)};
+                }
+                this.updateSettingsDisplay();
+            }
+
+            saveSettings() {
+                this.settings.maxLogLines = parseInt(document.getElementById('maxLinesInput').value) || 200;
+                this.settings.autoSave = document.getElementById('autoSaveCheckbox').checked;
+                this.settings.baudRate = parseInt(document.getElementById('baudRateSelect').value) || 9600;
+                this.settings.bufferSize = parseInt(document.getElementById('bufferSizeSelect').value) || 4096;
+                this.settings.truncatedHandling = document.getElementById('truncatedHandlingSelect').value;
+                
+                localStorage.setItem('gpsTrackerSettings', JSON.stringify(this.settings));
+                this.updateSettingsDisplay();
+                this.hideSettings();
+                
+                // Обновляем массив lastMessages под новый размер
+                if (this.lastMessages.length > this.settings.maxLogLines) {
+                    this.lastMessages = this.lastMessages.slice(-this.settings.maxLogLines);
+                }
+            }
+
+            updateSettingsDisplay() {
+                document.getElementById('maxLinesInput').value = this.settings.maxLogLines;
+                document.getElementById('autoSaveCheckbox').checked = this.settings.autoSave;
+                document.getElementById('baudRateSelect').value = this.settings.baudRate;
+                document.getElementById('bufferSizeSelect').value = this.settings.bufferSize;
+                document.getElementById('truncatedHandlingSelect').value = this.settings.truncatedHandling;
+                document.getElementById('savedLinesCount').textContent = this.settings.maxLogLines;
+            }
+
+            showSettings() {
+                document.getElementById('settingsModal').style.display = 'flex';
+            }
+
+            hideSettings() {
+                document.getElementById('settingsModal').style.display = 'none';
+            }
+
+            toggleLayout() {
+                const appContainer = document.getElementById('appContainer');
+                const layoutIcon = document.getElementById('layoutIcon');
+                const layoutToggleBtn = document.getElementById('layoutToggleBtn');
+                
+                this.isHorizontalLayout = !this.isHorizontalLayout;
+                
+                if (this.isHorizontalLayout) {
+                    appContainer.className = 'app-container horizontal-layout';
+                    layoutIcon.textContent = '↔';
+                    layoutToggleBtn.innerHTML = '<span id="layoutIcon">↔</span> Горизонтально';
+                } else {
+                    appContainer.className = 'app-container vertical-layout';
+                    layoutIcon.textContent = '↕';
+                    layoutToggleBtn.innerHTML = '<span id="layoutIcon">↕</span> Вертикально';
+                }
+                
+                setTimeout(() => {
+                    this.map.invalidateSize();
+                }, 300);
+            }
+
+            async connectSerial() {
+                try {
+                    if (!navigator.serial) {
+                        throw new Error('Web Serial API не поддерживается вашим браузером. Используйте Chrome/Edge 89+.');
+                    }
+
+                    this.serialPort = await navigator.serial.requestPort();
+                    await this.serialPort.open({ 
+                        baudRate: this.settings.baudRate,
+                        dataBits: 8,
+                        stopBits: 1,
+                        parity: 'none'
+                    });
+
+                    this.isConnected = true;
+                    this.updateConnectionStatus('connected', 'Подключено к ATGM336H');
+                    document.getElementById('connectText').textContent = 'Отключиться';
+                    document.getElementById('connectIcon').textContent = '🔒';
+                    document.getElementById('connectBtn').classList.add('connected');
+
+                    this.readData();
+
+                } catch (error) {
+                    console.error('Ошибка подключения:', error);
+                    this.updateConnectionStatus('error', `Ошибка: ${error.message}`);
+                    this.errorCount++;
+                }
+            }
+
+            async readData() {
+                const decoder = new TextDecoder();
+                
+                while (this.serialPort.readable && this.isConnected) {
+                    this.reader = this.serialPort.readable.getReader();
+                    
+                    try {
+                        while (true) {
+                            const { value, done } = await this.reader.read();
+                            if (done) break;
+                            
+                            const text = decoder.decode(value);
+                            this.processDataWithBuffer(text);
+                        }
+                    } catch (error) {
+                        console.error('Ошибка чтения:', error);
+                        this.errorCount++;
+                    } finally {
+                        this.reader.releaseLock();
+                    }
+                }
+            }
+
+            processDataWithBuffer(newData) {
+                // Добавляем новые данные в буфер
+                this.dataBuffer += newData;
+                
+                // Обновляем отображение размера буфера
+                document.getElementById('bufferSize').textContent = this.dataBuffer.length;
+                
+                // Ограничиваем размер буфера для предотвращения утечек памяти
+                if (this.dataBuffer.length > this.settings.bufferSize) {
+                    this.dataBuffer = this.dataBuffer.slice(-this.settings.bufferSize);
+                }
+                
+                // Обрабатываем полные строки из буфера
+                let newlineIndex;
+                while ((newlineIndex = this.dataBuffer.indexOf('\n')) !== -1) {
+                    // Извлекаем строку до символа новой строки
+                    let line = this.dataBuffer.substring(0, newlineIndex).trim();
+                    
+                    // Удаляем обработанную строку из буфера
+                    this.dataBuffer = this.dataBuffer.substring(newlineIndex + 1);
+                    
+                    // Обрабатываем извлеченную строку
+                    if (line) {
+                        this.processNMEALine(line);
+                    }
+                }
+            }
+
+            processNMEALine(line) {
+                this.messageCount++;
+                
+                // Проверяем, является ли сообщение обрезанным
+                const isTruncated = this.isTruncatedMessage(line);
+                
+                if (isTruncated) {
+                    this.truncatedCount++;
+                    
+                    // Обрабатываем обрезанные сообщения в зависимости от настроек
+                    switch (this.settings.truncatedHandling) {
+                        case "ignore":
+                            // Игнорируем обрезанные сообщения
+                            return;
+                        case "reconstruct":
+                            // Пытаемся восстановить сообщение
+                            line = this.tryReconstructMessage(line);
+                            if (!line) return; // Если не удалось восстановить, игнорируем
+                            break;
+                        case "save":
+                        default:
+                            // Сохраняем как есть
+                            break;
+                    }
+                }
+                
+                // Сохраняем сообщение в лог
+                this.lastMessages.push(line);
+                
+                // Ограничиваем количество сохраняемых сообщений
+                if (this.lastMessages.length > this.settings.maxLogLines) {
+                    this.lastMessages.shift();
+                }
+                
+                this.displayNMEALine(line, isTruncated);
+                
+                // Парсим только полные сообщения
+                if (!isTruncated) {
+                    this.parseNMEALine(line);
+                }
+                
+                this.updateDisplay();
+            }
+
+            isTruncatedMessage(line) {
+                // Проверяем признаки обрезанного сообщения:
+                
+                // 1. Не начинается с '$'
+                if (!line.startsWith('$')) return true;
+                
+                // 2. Не содержит '*' (контрольной суммы)
+                if (!line.includes('*')) return true;
+                
+                // 3. Слишком короткое сообщение
+                if (line.length < 10) return true;
+                
+                // 4. Не заканчивается корректной контрольной суммой
+                const asteriskIndex = line.indexOf('*');
+                if (asteriskIndex === -1 || asteriskIndex >= line.length - 2) return true;
+                
+                // 5. Проверяем контрольную сумму
+                if (!this.verifyChecksum(line)) return true;
+                
+                return false;
+            }
+
+            verifyChecksum(line) {
+                try {
+                    const asteriskIndex = line.indexOf('*');
+                    if (asteriskIndex === -1) return false;
+                    
+                    const data = line.substring(1, asteriskIndex);
+                    const checksum = line.substring(asteriskIndex + 1);
+                    
+                    let calculated = 0;
+                    for (let i = 0; i < data.length; i++) {
+                        calculated ^= data.charCodeAt(i);
+                    }
+                    
+                    return calculated.toString(16).toUpperCase().padStart(2, '0') === checksum;
+                } catch (error) {
+                    return false;
+                }
+            }
+
+            tryReconstructMessage(line) {
+                // Простые эвристики для восстановления обрезанных сообщений
+                
+                // Если сообщение начинается с '$', но нет '*', пытаемся найти похожее полное сообщение
+                if (line.startsWith('$') && !line.includes('*')) {
+                    // Ищем похожие полные сообщения в истории
+                    for (let i = this.lastMessages.length - 1; i >= 0; i--) {
+                        const prevMessage = this.lastMessages[i];
+                        if (prevMessage.startsWith(line.substring(0, 6)) && prevMessage.includes('*')) {
+                            // Нашли похожее сообщение, используем его структуру
+                            const asteriskIndex = prevMessage.indexOf('*');
+                            const expectedLength = asteriskIndex + 3; // * + 2 символа контрольной суммы
+                            
+                            if (line.length >= expectedLength) {
+                                // Сообщение достаточно длинное, возможно, просто нет '*'
+                                const data = line.substring(0, expectedLength - 3);
+                                const checksum = this.calculateChecksum(data);
+                                return data + '*' + checksum;
+                            }
+                            break;
+                        }
+                    }
+                }
+                
+                return null; // Не удалось восстановить
+            }
+
+            calculateChecksum(data) {
+                let checksum = 0;
+                for (let i = 0; i < data.length; i++) {
+                    checksum ^= data.charCodeAt(i);
+                }
+                return checksum.toString(16).toUpperCase().padStart(2, '0');
+            }
+
+            parseNMEALine(line) {
+                try {
+                    const fields = line.split(',');
+                    const sentenceType = fields[0];
+                    
+                    let hasValidData = false;
+                    
+                    switch(sentenceType) {
+                        case '$GNGGA':
+                        case '$GPGGA':
+                            hasValidData = this.parseGGA(fields);
+                            break;
+                        case '$GNRMC':
+                        case '$GPRMC':
+                            hasValidData = this.parseRMC(fields);
+                            break;
+                        case '$GNGSA':
+                        case '$GPGSA':
+                            this.parseGSA(fields);
+                            hasValidData = true;
+                            break;
+                        case '$GPTXT':
+                            if (line.includes('PPS')) {
+                                this.detectPPS();
+                            }
+                            hasValidData = true;
+                            break;
+                        case '$GPGSV':
+                        case '$BDGSV':
+                        case '$GLGSV':
+                            hasValidData = true;
+                            break;
+                        default:
+                            hasValidData = this.checkBasicValidity(fields);
+                    }
+                    
+                    if (!hasValidData) {
+                        this.invalidCount++;
+                    }
+                    
+                } catch (error) {
+                    console.error('Ошибка парсинга NMEA:', error);
+                    this.errorCount++;
+                    this.invalidCount++;
+                }
+            }
+
+            checkBasicValidity(fields) {
+                if (fields.length < 3) return false;
+                
+                const lastField = fields[fields.length - 1];
+                if (!lastField.includes('*')) return false;
+                
+                return true;
+            }
+
+            parseGGA(fields) {
+                let hasValidData = false;
+                
+                if (fields[6] && fields[6] !== '0') {
+                    const lat = this.convertToDecimal(fields[2], fields[3]);
+                    const lon = this.convertToDecimal(fields[4], fields[5]);
+                    
+                    if (lat && lon) {
+                        this.updatePosition(lat, lon);
+                        hasValidData = true;
+                    }
+                    
+                    if (fields[9]) {
+                        document.getElementById('altitude').textContent = 
+                            `${parseFloat(fields[9]).toFixed(1)} м`;
+                    }
+                }
+                
+                if (fields[1]) {
+                    const timeStr = fields[1];
+                    if (timeStr.length >= 6) {
+                        const formattedTime = `${timeStr.substr(0,2)}:${timeStr.substr(2,2)}:${timeStr.substr(4,2)}`;
+                        document.getElementById('gpsTime').textContent = formattedTime;
+                        hasValidData = true;
+                    }
+                }
+                
+                if (fields[6]) {
+                    this.updateFixQuality(parseInt(fields[6]));
+                    hasValidData = true;
+                }
+                
+                if (fields[7]) {
+                    const satellites = parseInt(fields[7]);
+                    document.getElementById('satellitesCount').textContent = satellites;
+                    const percent = Math.min((satellites / 20) * 100, 100);
+                    document.getElementById('satelliteBar').style.width = `${percent}%`;
+                    hasValidData = true;
+                }
+                
+                if (fields[8]) {
+                    const hdop = parseFloat(fields[8]);
+                    document.getElementById('hdop').textContent = hdop.toFixed(1);
+                    this.updateHDOPQuality(hdop);
+                    hasValidData = true;
+                }
+                
+                return hasValidData;
+            }
+
+            parseRMC(fields) {
+                let hasValidData = false;
+                
+                if (fields[2] === 'A') {
+                    const lat = this.convertToDecimal(fields[3], fields[4]);
+                    const lon = this.convertToDecimal(fields[5], fields[6]);
+                    
+                    if (lat && lon) {
+                        this.updatePosition(lat, lon);
+                        hasValidData = true;
+                    }
+                    
+                    if (fields[7]) {
+                        const speedKnots = parseFloat(fields[7]);
+                        const speedKmh = speedKnots * 1.852;
+                        document.getElementById('speed').textContent = 
+                            `${speedKmh.toFixed(1)} км/ч`;
+                        hasValidData = true;
+                    }
+                    
+                    if (fields[8]) {
+                        document.getElementById('course').textContent = 
+                            `${parseFloat(fields[8]).toFixed(0)}°`;
+                        hasValidData = true;
+                    }
+                }
+                
+                if (fields[1]) {
+                    const timeStr = fields[1];
+                    if (timeStr.length >= 6) {
+                        hasValidData = true;
+                    }
+                }
+                
+                return hasValidData;
+            }
+
+            parseGSA(fields) {
+                return true;
+            }
+
+            convertToDecimal(coord, direction) {
+                if (!coord || !direction) return null;
+                
+                try {
+                    const degrees = parseFloat(coord.substring(0, 2));
+                    const minutes = parseFloat(coord.substring(2));
+                    
+                    let decimal = degrees + minutes / 60.0;
+                    
+                    if (direction === 'S' || direction === 'W') {
+                        decimal = -decimal;
+                    }
+                    
+                    return decimal;
+                } catch (error) {
+                    console.error('Ошибка конвертации координат:', error);
+                    return null;
+                }
+            }
+
+            detectPPS() {
+                this.ppsCount++;
+                document.getElementById('ppsStatus').textContent = '✅ PPS АКТИВЕН';
+                document.getElementById('ppsStatus').classList.add('pulse');
+                document.getElementById('ppsCount').textContent = this.ppsCount;
+                
+                setTimeout(() => {
+                    document.getElementById('ppsStatus').textContent = '⚪ ОЖИДАНИЕ';
+                    document.getElementById('ppsStatus').classList.remove('pulse');
+                }, 2000);
+            }
+
+            updatePosition(lat, lon) {
+                const coordsText = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+                document.getElementById('coordinates').textContent = coordsText;
+                
+                const latLng = [lat, lon];
+                
+                if (this.marker) {
+                    this.marker.setLatLng(latLng);
+                } else {
+                    this.marker = L.marker(latLng)
+                        .addTo(this.map)
+                        .bindPopup('Текущее положение GPS')
+                        .openPopup();
+                    
+                    this.map.setView(latLng, 15);
+                }
+                
+                const hdopElement = document.getElementById('hdop');
+                if (hdopElement && hdopElement.textContent !== '0.0') {
+                    const hdop = parseFloat(hdopElement.textContent);
+                    const accuracyRadius = hdop * 5;
+                    
+                    if (this.accuracyCircle) {
+                        this.map.removeLayer(this.accuracyCircle);
+                    }
+                    
+                    this.accuracyCircle = L.circle(latLng, {
+                        radius: accuracyRadius,
+                        color: '#3498db',
+                        fillColor: '#2980b9',
+                        fillOpacity: 0.1,
+                        weight: 1
+                    }).addTo(this.map);
+                }
+            }
+
+            updateFixQuality(quality) {
+                const qualities = {
+                    0: ['Нет фиксации', 'quality-none'],
+                    1: ['GPS фиксация', 'quality-excellent'],
+                    2: ['DGPS фиксация', 'quality-good'],
+                    3: ['PPS фиксация', 'quality-excellent'],
+                    4: ['RTK', 'quality-excellent'],
+                    5: ['Float RTK', 'quality-good']
+                };
+                
+                const [text, className] = qualities[quality] || ['Неизвестно', 'quality-none'];
+                const element = document.getElementById('fixStatus');
+                element.textContent = text;
+                element.className = `status-value ${className}`;
+            }
+
+            updateHDOPQuality(hdop) {
+                const element = document.getElementById('hdop');
+                if (hdop < 1) element.className = 'status-value quality-excellent';
+                else if (hdop < 2) element.className = 'status-value quality-good';
+                else if (hdop < 5) element.className = 'status-value quality-poor';
+                else element.className = 'status-value quality-none';
+            }
+
+            updateConnectionStatus(status, message) {
+                const indicator = document.getElementById('connectionIndicator');
+                const statusElement = document.getElementById('connectionStatus');
+                
+                statusElement.textContent = message;
+                
+                indicator.className = 'signal-indicator';
+                if (status === 'connected') {
+                    indicator.classList.add('signal-strong');
+                } else if (status === 'error') {
+                    indicator.classList.add('signal-weak');
+                }
+            }
+
+            displayNMEALine(line, isTruncated = false) {
+                const nmeaDiv = document.getElementById('nmeaData');
+                const timestamp = new Date().toLocaleTimeString();
+                const prefix = isTruncated ? '⚠️ ' : '';
+                nmeaDiv.innerHTML += `${prefix}[${timestamp}] ${line}\n`;
+                nmeaDiv.scrollTop = nmeaDiv.scrollHeight;
+                
+                // Ограничиваем количество отображаемых строк
+                const lines = nmeaDiv.innerHTML.split('\n');
+                if (lines.length > 100) {
+                    nmeaDiv.innerHTML = lines.slice(-100).join('\n');
+                }
+            }
+
+            updateDisplay() {
+                document.getElementById('messageCount').textContent = this.messageCount;
+                document.getElementById('errorCount').textContent = this.errorCount;
+                document.getElementById('invalidCount').textContent = this.invalidCount;
+                document.getElementById('truncatedCount').textContent = this.truncatedCount;
+                document.getElementById('bufferSize').textContent = this.dataBuffer.length;
+                
+                // Расчет скорости данных (сообщений в секунду)
+                const uptimeSeconds = (Date.now() - this.startTime) / 1000;
+                const dataRate = uptimeSeconds > 0 ? (this.messageCount / uptimeSeconds).toFixed(1) : '0';
+                document.getElementById('dataRate').textContent = `${dataRate}/с`;
+            }
+
+            updateUptime() {
+                const uptimeSeconds = Math.floor((Date.now() - this.startTime) / 1000);
+                const hours = Math.floor(uptimeSeconds / 3600);
+                const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+                const seconds = uptimeSeconds % 60;
+                
+                document.getElementById('uptime').textContent = 
+                    `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+
+            saveLog() {
+                if (this.lastMessages.length === 0) {
+                    alert('Нет данных для сохранения');
+                    return;
+                }
+
+                const now = new Date();
+                const dateStr = now.toISOString().slice(0,10).replace(/-/g, '');
+                const timeStr = now.toTimeString().slice(0,8).replace(/:/g, '');
+                const filename = `GPS_modem_${dateStr}_${timeStr}.txt`;
+                
+                // Добавляем заголовок с информацией о сессии
+                let logContent = `GPS Modem Log - ${now.toLocaleString()}\n`;
+                logContent += `Messages: ${this.messageCount}, Errors: ${this.errorCount}, Invalid: ${this.invalidCount}, Truncated: ${this.truncatedCount}\n`;
+                logContent += `Settings: ${this.settings.maxLogLines} lines, ${this.settings.baudRate} baud\n`;
+                logContent += "=".repeat(50) + "\n";
+                logContent += this.lastMessages.join('\n');
+                
+                const blob = new Blob([logContent], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                alert(`Лог сохранен как: ${filename}\nСообщений: ${this.lastMessages.length}`);
+            }
+
+            async disconnect() {
+                // Автосохранение при отключении если включено
+                if (this.settings.autoSave && this.lastMessages.length > 0) {
+                    this.saveLog();
+                }
+                
+                this.isConnected = false;
+                
+                if (this.reader) {
+                    await this.reader.cancel();
+                }
+                
+                if (this.serialPort) {
+                    await this.serialPort.close();
+                }
+                
+                // Очищаем буфер при отключении
+                this.dataBuffer = "";
+                
+                this.updateConnectionStatus('error', 'Отключено');
+                document.getElementById('connectText').textContent = 'Подключиться';
+                document.getElementById('connectIcon').textContent = '🔗';
+                document.getElementById('connectBtn').classList.remove('connected');
+            }
+        }
+
+        // Инициализация при загрузке страницы
+        let gpsTracker;
+        document.addEventListener('DOMContentLoaded', () => {
+            gpsTracker = new GPSTracker();
+            
+            if (!navigator.serial) {
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('connectText').textContent = 'Web Serial не поддерживается';
+                gpsTracker.updateConnectionStatus('error', 
+                    'Web Serial API не поддерживается. Используйте Chrome/Edge 89+.');
+            }
+        });
+    </script>
+</body>
+</html>
+
